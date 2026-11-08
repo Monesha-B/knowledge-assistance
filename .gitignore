@@ -1,0 +1,36 @@
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+mlruns/
+training/classifier_output/
+qdrant_storage/
+*.pyc
+.DS_Store
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# MLflow
+mlruns/
+mlartifacts/
+mlflow.db
+
+# Trained models
+training/classifier_output/
+
+# Local files and uploads
+uploads/
+data/uploads/
+.streamlit/secrets.toml
+
+# macOS
+.DS_Store

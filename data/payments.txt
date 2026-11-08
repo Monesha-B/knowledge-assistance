@@ -1,0 +1,2 @@
+Demo company policy — Payments (fictional, for learning only)
+Customers can pay by credit or debit card. If a payment fails, verify the card details and try again, or contact the bank. For duplicate charges, contact support and provide the order reference and transaction date. Never share complete card numbers in chat. This policy is fictional sample data.

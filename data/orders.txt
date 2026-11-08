@@ -1,0 +1,2 @@
+Demo company policy — Orders (fictional, for learning only)
+Once shipped, customers receive an email containing a tracking number. Orders normally dispatch within 2 business days. The tracking number can be used to see carrier updates. Customers can request an address change before dispatch; an address change may not be possible after shipment. This policy is fictional sample data.
