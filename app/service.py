@@ -12,7 +12,11 @@ def answer_question(question: str) -> Answer:
     question = question.strip()
     category = classify(question)
     provider = os.getenv('LLM_PROVIDER', 'ollama').lower()
-    model_name = os.getenv('CLAUDE_MODEL', 'claude-sonnet-4-5') if provider == 'claude' else os.getenv('OLLAMA_MODEL', 'gemma3:1b')
+    model_name = (
+        os.getenv('GEMINI_MODEL', 'gemini-2.5-flash-lite') if provider == 'gemini'
+        else os.getenv('CLAUDE_MODEL', 'claude-sonnet-4-5') if provider == 'claude'
+        else os.getenv('OLLAMA_MODEL', 'gemma3:1b')
+    )
     # v3 invalidates older cached answers generated without intelligent routing.
     key = f'rag:v3:{provider}:{model_name}:{category}:{question.casefold()}'
     cache = None

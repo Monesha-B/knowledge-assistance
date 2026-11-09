@@ -12,7 +12,13 @@ GENERAL_SYSTEM = ('You are a friendly assistant. Answer ordinary greetings and g
 
 def get_llm():
     provider = os.getenv('LLM_PROVIDER', 'ollama').lower()
-    if provider == 'claude':
+    if provider == 'gemini':
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        if not os.getenv('GOOGLE_API_KEY'):
+            raise RuntimeError('Set GOOGLE_API_KEY to enable Gemini')
+        name = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash-lite')
+        llm = ChatGoogleGenerativeAI(model=name, temperature=0)
+    elif provider == 'claude':
         if not os.getenv('ANTHROPIC_API_KEY'):
             raise RuntimeError('Set ANTHROPIC_API_KEY in .env to enable Claude mode')
         from langchain_anthropic import ChatAnthropic

@@ -18,3 +18,4 @@ httpx
 numpy
 
 pypdf>=5,<7
+langchain-google-genai

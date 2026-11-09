@@ -14,18 +14,38 @@ def model_bundle():
     model = AutoModelForSequenceClassification.from_pretrained(path).eval()
     return tokenizer, model
 
+
 def classify(question):
+    q = question.lower()
+
+    # Give explicit business terms priority over the small ML model.
+    rules = {
+        "refund": ["refund", "return", "money back", "reimbursement"],
+        "order": ["order", "delivery", "package", "shipping", "tracking"],
+        "payment": ["payment", "card", "charged", "invoice", "billing"],
+    }
+
+    for category, keywords in rules.items():
+        if any(keyword in q for keyword in keywords):
+            return category
+
+    # Use fine-tuned DistilBERT for less obvious questions.
     bundle = model_bundle()
     if bundle is None:
-        # Safe onboarding fallback until training completes; clearly not a trained classifier.
-        q = question.lower()
-        if any(word in q for word in ['refund', 'return', 'money back']): return 'refund'
-        if any(word in q for word in ['order', 'delivery', 'package', 'shipping']): return 'order'
-        if any(word in q for word in ['payment', 'card', 'charged', 'invoice']): return 'payment'
-        return 'other'
+        return "other"
+
     import torch
+
     tokenizer, model = bundle
-    tokens = tokenizer(question, return_tensors='pt', truncation=True, max_length=128)
+    tokens = tokenizer(
+        question,
+        return_tensors="pt",
+        truncation=True,
+        max_length=128
+    )
+
     with torch.no_grad():
-        index = model(**tokens).logits.argmax(dim=-1).item()
+        logits = model(**tokens).logits
+        index = logits.argmax(dim=-1).item()
+
     return model.config.id2label[index]

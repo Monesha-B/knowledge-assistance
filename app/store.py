@@ -7,7 +7,10 @@ VALID_CATEGORIES = {'order', 'refund', 'payment'}
 
 
 def client():
-    return QdrantClient(url=os.getenv('QDRANT_URL', 'http://localhost:6333'))
+    return QdrantClient(
+        url=os.getenv('QDRANT_URL', 'http://localhost:6333'),
+        api_key=os.getenv('QDRANT_API_KEY') or None,
+    )
 
 
 def index(chunks):
@@ -18,6 +21,12 @@ def index(chunks):
     if db.collection_exists(COLLECTION):
         db.delete_collection(COLLECTION)
     db.create_collection(COLLECTION, vectors_config=models.VectorParams(size=len(vectors[0]), distance=models.Distance.COSINE))
+    db.create_payload_index(
+        collection_name=COLLECTION,
+        field_name='category',
+        field_schema=models.PayloadSchemaType.KEYWORD,
+        wait=True,
+    )
     db.upsert(collection_name=COLLECTION, points=[
         models.PointStruct(id=c['id'], vector=v, payload={
             'text': c['text'], 'source': c['source'],
