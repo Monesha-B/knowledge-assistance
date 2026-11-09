@@ -1,5 +1,6 @@
 """Simple, document-first interface for Knowledge Assistance."""
 import hashlib
+import os
 
 import streamlit as st
 
@@ -36,7 +37,7 @@ with st.sidebar:
     st.subheader("Workspace")
     mode = st.radio(
         "Choose a knowledge source",
-        ["My documents", "Example documents"],
+        ["Example documents"] if os.getenv("PUBLIC_DEMO") == "1" else ["My documents", "Example documents"],
         label_visibility="collapsed",
     )
     st.divider()
