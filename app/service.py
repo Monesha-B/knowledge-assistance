@@ -48,7 +48,7 @@ def answer_question(question: str) -> Answer:
     return answer
 
 
-def answer_uploaded_question(question: str, collection: str) -> Answer:
+def answer_uploaded_question(question: str, chunks: list[dict], vectors: list[list[float]]) -> Answer:
     """Answer from the active visitor's uploads. Do not cache private documents in Redis."""
     from app.uploads import search_uploads
     question = question.strip()
@@ -59,7 +59,7 @@ def answer_uploaded_question(question: str, collection: str) -> Answer:
         reply, model = generate_general(question)
         return Answer(question=question, category='general', answer=reply,
                       citations=[], model=model, cached=False)
-    docs = search_uploads(question, collection)
+    docs = search_uploads(question, chunks, vectors)
     reply, model = generate(question, docs)
     return Answer(question=question, category='uploaded documents', answer=reply,
                   citations=[Citation(source=d['source'], excerpt=d['text'][:240]) for d in docs],

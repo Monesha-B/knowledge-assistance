@@ -13,7 +13,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from app.service import answer_question, answer_uploaded_question
-from app.uploads import ALLOWED, MAX_FILE_BYTES, delete_uploads, index_uploads, new_collection_name
+from app.uploads import ALLOWED, MAX_FILE_BYTES, MAX_FILES, index_uploads
 
 st.set_page_config(
     page_title="Knowledge Assistance",
@@ -32,7 +32,8 @@ st.markdown("""
 
 for key, default in (
     ("messages", []), ("sample_messages", []),
-    ("upload_collection", None), ("upload_fingerprint", None),
+    ("upload_docs", None), ("upload_vectors", None),
+    ("upload_fingerprint", None), ("upload_widget_nonce", 0),
     ("upload_file_names", []),
 ):
     if key not in st.session_state:
@@ -45,16 +46,16 @@ with st.sidebar:
     st.subheader("Workspace")
     mode = st.radio(
         "Choose a knowledge source",
-        ["Example documents"] if os.getenv("PUBLIC_DEMO") == "1" else ["My documents", "Example documents"],
+        ["My documents", "Example documents"],
         label_visibility="collapsed",
     )
     st.divider()
     st.markdown("**How it works**")
-    st.markdown("1. Upload documents.\n2. Select **Prepare documents**.\n3. Ask questions in the chat.")
+    st.markdown("1. Choose a document source.\n2. Prepare documents if uploading.\n3. Ask questions.")
     st.caption("Example documents are fictional order, refund, and payment policies.")
     st.divider()
     st.caption("Answers are AI-generated. Check source excerpts for important details.")
-    st.caption("Do not upload sensitive information. Uploaded text is kept in Qdrant until you delete it; this demo does not have account-based access controls.")
+    st.warning("Public demo: do not upload confidential or personal information. Uploaded text and embeddings stay in this browser session on the app server, not in Qdrant. Relevant excerpts are sent to Gemini to answer questions. Closing the session does not guarantee immediate memory erasure or provider-side deletion.")
 
 is_upload = mode == "My documents"
 history_key = "messages" if is_upload else "sample_messages"
@@ -62,10 +63,11 @@ history_key = "messages" if is_upload else "sample_messages"
 if is_upload:
     st.subheader("1. Add your documents")
     files_input = st.file_uploader(
-        "Choose up to 5 files (PDF, Word, TXT or Markdown)",
+        "Choose up to 3 files (PDF, Word, TXT or Markdown)",
         type=sorted(extension.lstrip(".") for extension in ALLOWED),
         accept_multiple_files=True,
-        help="Maximum 10 MB per file. Scanned PDFs without selectable text are not supported.",
+        key=f"upload_{st.session_state.upload_widget_nonce}",
+        help="Maximum 2 MB per file, 20 PDF pages, 40,000 extracted characters total. No scanned PDFs.",
     )
     files = [(f.name, f.getvalue()) for f in files_input] if files_input else []
     fingerprint = None
@@ -78,48 +80,39 @@ if is_upload:
         st.caption(f"{len(files)} selected · Up to {MAX_FILE_BYTES // (1024 * 1024)} MB per file")
 
     needs_indexing = bool(files) and fingerprint != st.session_state.upload_fingerprint
-    if needs_indexing and st.session_state.upload_collection:
+    if needs_indexing and st.session_state.upload_docs is not None:
         st.info("You selected different files. Select **Prepare documents** to replace your current set.")
 
     if st.button("Prepare documents", type="primary", disabled=not needs_indexing):
-        if len(files) > 5:
-            st.error("Select no more than five files.")
+        if len(files) > MAX_FILES:
+            st.error(f"Select no more than {MAX_FILES} files.")
         else:
-            new_collection = new_collection_name()
             try:
                 with st.spinner("Preparing your documents for search..."):
-                    count = index_uploads(files, new_collection)
-                previous = st.session_state.upload_collection
-                st.session_state.upload_collection = new_collection
+                    chunks, vectors = index_uploads(files)
+                st.session_state.upload_docs = chunks
+                st.session_state.upload_vectors = vectors
                 st.session_state.upload_fingerprint = fingerprint
                 st.session_state.upload_file_names = [name for name, _ in files]
                 st.session_state.messages = []
-                if previous:
-                    try:
-                        delete_uploads(previous)
-                    except Exception:
-                        st.warning("The previous document set could not be deleted. Please review stored collections before sharing this deployment.")
-                st.success(f"Ready! Processed {len(files)} file(s) into {count} searchable sections.")
+                st.success(f"Ready! Processed {len(files)} file(s) into {len(chunks)} searchable sections (session memory only).")
             except Exception as exc:
-                st.error(f"Could not prepare documents: {exc}")
+                st.error("Could not prepare these documents. Please check their type and size.")
 
-    if st.session_state.upload_collection:
+    if st.session_state.upload_docs is not None:
         names = st.session_state.upload_file_names
         st.success("Your documents are ready for questions.")
         with st.expander(f"Current documents ({len(names)})"):
             for name in names:
                 st.write(f"• {name}")
-        if st.button("Remove uploaded documents", help="Delete the current documents from Qdrant"):
-            try:
-                delete_uploads(st.session_state.upload_collection)
-            except Exception as exc:
-                st.error(f"Could not delete documents: {exc}")
-            else:
-                st.session_state.upload_collection = None
-                st.session_state.upload_fingerprint = None
-                st.session_state.upload_file_names = []
-                st.session_state.messages = []
-                st.rerun()
+        if st.button("Remove uploaded documents", help="Clear document embeddings and chat from this session"):
+            st.session_state.upload_docs = None
+            st.session_state.upload_vectors = None
+            st.session_state.upload_fingerprint = None
+            st.session_state.upload_file_names = []
+            st.session_state.messages = []
+            st.session_state.upload_widget_nonce += 1
+            st.rerun()
     else:
         st.info("Add a document and select **Prepare documents** to start chatting.")
 else:
@@ -155,14 +148,14 @@ if st.session_state[history_key]:
 
 question = st.chat_input(
     "Ask about the documents..." if is_upload else "Ask a question...",
-    disabled=is_upload and not st.session_state.upload_collection,
+    disabled=is_upload and st.session_state.upload_docs is None,
 )
 if question:
     st.session_state[history_key].append({"role": "user", "content": question})
     try:
         with st.spinner("Looking for relevant information..."):
             if is_upload:
-                result = answer_uploaded_question(question, st.session_state.upload_collection)
+                result = answer_uploaded_question(question, st.session_state.upload_docs, st.session_state.upload_vectors)
             else:
                 result = answer_question(question)
         st.session_state[history_key].append({
@@ -172,7 +165,7 @@ if question:
         })
     except Exception as exc:
         st.session_state[history_key].append({
-            "role": "assistant", "content": f"Sorry, I couldn't complete that request. Details: {exc}"
+            "role": "assistant", "content": "Sorry, this request could not be completed. Please retry or try a smaller document."
         })
     st.rerun()
 
