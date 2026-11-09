@@ -4,6 +4,14 @@ import os
 
 import streamlit as st
 
+from pathlib import Path
+import sys
+
+# Make the project root available to Streamlit Cloud.
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from app.service import answer_question, answer_uploaded_question
 from app.uploads import ALLOWED, MAX_FILE_BYTES, delete_uploads, index_uploads, new_collection_name
 
