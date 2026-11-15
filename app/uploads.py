@@ -76,7 +76,7 @@ def make_chunks(files: list[tuple[str, bytes]]) -> list[dict]:
         for source, text in extract_document(name, content):
             total_chars += len(text)
             if total_chars > MAX_CHARS:
-                raise ValueError('Combined extracted document text must be under 200,000 characters')
+                raise ValueError('Combined extracted document text must be under 40,000 characters')
             for snippet in splitter.split_text(text):
                 if snippet.strip():
                     chunks.append({'id': len(chunks) + 1, 'text': snippet, 'source': source})
